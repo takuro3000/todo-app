@@ -1,34 +1,104 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
+import { useState, useEffect } from 'react'
 import './App.css'
 
+interface Todo {
+  id: number;
+  title: string;
+  completed: boolean;
+}
+
 function App() {
-  const [count, setCount] = useState(0)
+  const [todos, setTodos] = useState<Todo[]>([]);
+  const [newTodoTitle, setNewTodoTitle] = useState('');
+
+  useEffect(() => {
+    fetchTodos();
+  }, []);
+
+  const fetchTodos = async () => {
+    try {
+      const response = await fetch('http://localhost:8080/todos');
+      const data = await response.json();
+      setTodos(data);
+    } catch (error) {
+      console.error('Error fetching todos:', error);
+    }
+  };
+
+  const addTodo = async () => {
+    if (!newTodoTitle.trim()) return;
+    try {
+      const response = await fetch('http://localhost:8080/todos', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ title: newTodoTitle, completed: false }),
+      });
+      const data = await response.json();
+      setTodos([...todos, data]);
+      setNewTodoTitle('');
+    } catch (error) {
+      console.error('Error adding todo:', error);
+    }
+  };
+
+  const toggleTodo = async (id: number, currentCompleted: boolean, currentTitle: string) => {
+    try {
+      const response = await fetch(`http://localhost:8080/todos/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ title: currentTitle, completed: !currentCompleted }),
+      });
+      if (response.ok) {
+        setTodos(todos.map(todo =>
+          todo.id === id ? { ...todo, completed: !currentCompleted } : todo
+        ));
+      }
+    } catch (error) {
+      console.error('Error updating todo:', error);
+    }
+  };
+
+  const deleteTodo = async (id: number) => {
+    try {
+      const response = await fetch(`http://localhost:8080/todos/${id}`, {
+        method: 'DELETE',
+      });
+      if (response.ok) {
+        setTodos(todos.filter(todo => todo.id !== id));
+      }
+    } catch (error) {
+      console.error('Error deleting todo:', error);
+    }
+  };
 
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
+    <div className="app-container">
+      <h1>Todo App</h1>
+      <div className="add-todo-container">
+        <input
+          type="text"
+          value={newTodoTitle}
+          onChange={(e) => setNewTodoTitle(e.target.value)}
+          placeholder="Add a new task"
+          onKeyDown={(e) => e.key === 'Enter' && addTodo()}
+        />
+        <button onClick={addTodo}>Add</button>
       </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
+      <ul className="todo-list">
+        {todos.map(todo => (
+          <li key={todo.id} className={`todo-item ${todo.completed ? 'completed' : ''}`}>
+            <span onClick={() => toggleTodo(todo.id, todo.completed, todo.title)}>
+              {todo.title}
+            </span>
+            <button onClick={() => deleteTodo(todo.id)} className="delete-btn">Delete</button>
+          </li>
+        ))}
+      </ul>
+    </div>
   )
 }
 
